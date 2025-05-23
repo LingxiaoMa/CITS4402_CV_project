@@ -59,7 +59,7 @@ class ImageGUI:
         self.original_images = []
         self.image_paths = [] 
         base = Path(__file__).resolve().parent
-        self.model = joblib.load(base / "models/hog_svm_model_v2.pkl")
+        self.model = joblib.load(base / "Others/models/hog_svm_model_v2.pkl")
 
     def load_folder(self):
         # Open a dialog to select a folder and load all supported images
