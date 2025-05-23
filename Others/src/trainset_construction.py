@@ -4,7 +4,7 @@ import random
 from pathlib import Path
 from tqdm import tqdm
 
-output_summary_path = Path(__file__).resolve().parent.parent / "outputs/sample_count.txt"
+output_summary_path = Path(__file__).resolve().parent.parent / "outputs/sample_count.txt" # Set the output path
 
 
 def list_images_in_dir(dir_path, valid_exts={".jpg", ".jpeg", ".png", ".bmp"}):
@@ -15,44 +15,45 @@ def list_images_in_dir(dir_path, valid_exts={".jpg", ".jpeg", ".png", ".bmp"}):
 def resize(img, out_path, size):
     # Resize the image and save it to the specified path.
     resized = cv2.resize(img, size)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    cv2.imwrite(str(out_path), resized)
+    out_path.parent.mkdir(parents=True, exist_ok=True) # Ensure that the directory for saving the image exists, if it does not, create it automatically
+    cv2.imwrite(str(out_path), resized) # Save the image to the directory
 
 
 def mirror_resize(input, output, size=(64, 128)):
     # Resize all images in the specified directory and generate their horizontally flipped versions.
     input = Path(input)
     output = Path(output)
-    output.mkdir(parents=True, exist_ok=True)
+    output.mkdir(parents=True, exist_ok=True) 
 
-    images = list_images_in_dir(input)
+    images = list_images_in_dir(input) # Get all images path in the directory
     count = 0
 
     for img_path in tqdm(images, desc="Processing positive samples"):
         img = cv2.imread(str(img_path))
-        if img is None:
+        if img is None: # If the read process fail, go to next loop
             continue
             
-        out_name = output / f"pos_{count:06d}.jpg"
-        resize(img, out_name, size)
+        out_name = output / f"pos_{count:06d}.jpg" # Generate the save path for the resized image.
+        resize(img, out_name, size) # Resize and save the image
 
-        flipped = cv2.flip(img, 1)
-        out_flip_name = output / f"pos_{count+1:06d}.jpg"
-        resize(flipped, out_flip_name, size)
-        count += 2
+        flipped = cv2.flip(img, 1) # Flip the image
+        out_flip_name = output / f"pos_{count+1:06d}.jpg" # Generate the save path for the and flipped resized image.
+        resize(flipped, out_flip_name, size) # Resize and save the image
+        count += 2 # +2 mean we add origin image and flipped image
 
     print(f"[Positive] Total processed (with mirror): {count}")
 
 
 def random_crop(img, crop_ratio=(0.25, 0.5)):
     # Randomly crop a portion of the image, with the crop ratio specified by crop_ratio.
-    h, w, _ = img.shape
-    ch, cw = int(h * crop_ratio[1]), int(w * crop_ratio[0])
-    if h < ch or w < cw:
+    h, w, _ = img.shape # Get the height and width of the image 
+    ch, cw = int(h * crop_ratio[1]), int(w * crop_ratio[0]) # Calculate the height and width of the cropping area based on the cropping ratio
+    if h < ch or w < cw: # If the image itself is smaller than the cropping area, return None
         return None
-    x = random.randint(0, w - cw)
+    # Randomly select a point for cropping
+    x = random.randint(0, w - cw) 
     y = random.randint(0, h - ch)
-    return img[y:y+ch, x:x+cw]
+    return img[y:y+ch, x:x+cw] # Crop and return
 
 def random_crop_patches(input_dir, output_dir, target_size=(64,128), patches_per_image=10):
     # Randomly crop several patches from each image, resize them, and save.
@@ -60,8 +61,8 @@ def random_crop_patches(input_dir, output_dir, target_size=(64,128), patches_per
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    images = list_images_in_dir(input_dir)
-    collected = 0
+    images = list_images_in_dir(input_dir) # Get the file paths of all image files in the input directory
+    collected = 0 # Use it to name the image
 
     for img_path in tqdm(images, desc="Processing negative samples"):
         img = cv2.imread(str(img_path))
@@ -70,12 +71,12 @@ def random_crop_patches(input_dir, output_dir, target_size=(64,128), patches_per
 
         for i in range(patches_per_image):
             patch = random_crop(img, crop_ratio=(0.25, 0.5))
-            if patch is None:
+            if patch is None: # If the image itself is smaller than the cropping area, go to next image
                 continue
-            resized_patch = cv2.resize(patch, target_size)
-            out_path = output_dir / f"neg_{collected:06d}.jpg"
+            resized_patch = cv2.resize(patch, target_size) # Resize the patch to the target size.
+            out_path = output_dir / f"neg_{collected:06d}.jpg" # Every image have a unique number
             cv2.imwrite(str(out_path), resized_patch)
-            collected += 1
+            collected += 1 
 
     print(f"[Negative] Total negative patches generated: {collected}")
     
