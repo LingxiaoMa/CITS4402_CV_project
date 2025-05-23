@@ -35,9 +35,11 @@ def extract_features(image, label, size=(64,128)):
     return features, labels
 
 def main():
+    #Read samples after hard negative mining
     base_path = Path(__file__).resolve().parent.parent
     pos_dir = base_path / "data_processed/positive"
-    neg_dir = base_path / "data_processed/negative"
+     # The negative samples here include hard negatives mined from previous detections
+    neg_dir = base_path / "data_processed/negative"    
     model_path = base_path / "models/hog_svm_model_v2.pkl"
     log_path = base_path / "outputs/retrain_log.txt"
     
@@ -54,10 +56,12 @@ def main():
     X = np.array(pos_feats + neg_feats)
     y = np.array(pos_labels + neg_labels)
     
+    # Retrain a Linear Support Vector Classifier (SVM)
     print("[Training] Fitting LinearSVC...")
     clf = LinearSVC(verbose=1, max_iter=10000)
     clf.fit(X, y)
     
+    # Save the trained model Version2
     joblib.dump(clf, model_path)
     print(f"[Model Saved] {model_path}")
     

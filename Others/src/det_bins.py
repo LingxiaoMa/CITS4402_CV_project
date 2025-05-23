@@ -6,6 +6,8 @@ from pathlib import Path
 from skimage.feature import hog
 from tqdm import tqdm
 
+# This script is used to plot DET curves for models with different orientations setting:6,9,12
+
 win_w, win_h = 64, 128
 stride = 16
 
@@ -41,7 +43,7 @@ def evaluate_det_curve(model_path, hog_params, thresholds):
     nonhuman_imgs = list_images(base / "dataset-big/Testing set/non-human")
 
     results = []
-
+    #Compare true positive and false positive rates at various thresholds
     for threshold in thresholds:
         miss = 0
         total_fp = 0

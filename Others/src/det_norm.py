@@ -6,6 +6,8 @@ from pathlib import Path
 from skimage.feature import hog
 from tqdm import tqdm
 
+# This script is used to plot DET curves for models with different normalization technique:L1,L2,L2-Hys
+
 win_w, win_h = 64, 128
 stride = 16
 
@@ -37,7 +39,7 @@ def evaluate_det_curve(model_path, hog_params, thresholds):
     human_imgs = list_images(base / "dataset-big/Testing set/human")
     nonhuman_imgs = list_images(base / "dataset-big/Testing set/non-human")
     results = []
-
+    #Compare true positive and false positive rates at various thresholds
     for threshold in thresholds:
         miss = 0
         total_fp = 0

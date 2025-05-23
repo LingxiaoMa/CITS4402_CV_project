@@ -15,13 +15,13 @@ HOG_PARAMS = {
 
 # Window and stride settings for sliding window
 win_w , win_h = 64, 128
-stride = 16
-decision_threshold = 0 
+stride = 16  # Step size of the sliding window
+decision_threshold = 0   # Threshold for classifying as "positive" by the SVM
 
 base_path = Path(__file__).resolve().parent.parent
 model_path = base_path / "models/hog_svm_model_v1.pkl"
 neg_img_dir = base_path / "dataset-big/Training set/non-human"
-output_dir = base_path / "data_processed/negative"
+output_dir = base_path / "data_processed/negative" # Directory to save hard negatives:the same path during transet_construction
 output_dir.mkdir(parents=True, exist_ok=True)
 
 # Load trained SVM model
@@ -43,6 +43,9 @@ for img_dir in tqdm(list(neg_img_dir.glob("*.*")), desc="Hard Negative Example M
     if h < win_h or w < win_w:
         resized = cv2.resize(img, (win_w, win_h))
         features = hog(resized, **HOG_PARAMS)
+        # Evaluate the HOG features using the trained SVM classifier
+        # If the classifier mistakenly identifies the patch as a positive (human),
+        # treat it as a hard negative and save it for retraining
         if clf.decision_function([features])[0] > decision_threshold:
             out_path = output_dir / f"neg_{count:06d}.jpg"
             cv2.imwrite(str(out_path), resized)
@@ -63,12 +66,15 @@ for img_dir in tqdm(list(neg_img_dir.glob("*.*")), desc="Hard Negative Example M
         for x in x_positions:
             patch = img[y:y + win_h, x:x + win_w]
             features = hog(patch, **HOG_PARAMS)
+            # Evaluate the HOG features using the trained SVM classifier
+            # If the classifier mistakenly identifies the patch as a positive (human),
+            # treat it as a hard negative and save it for retraining
             if clf.decision_function([features])[0] > decision_threshold:
                 out_path = output_dir / f"neg_{count:06d}.jpg"
                 cv2.imwrite(str(out_path), patch)
                 count += 1
                 
-
+#save the summary information in a log
 log_path = base_path / "outputs/hard_negative_log.txt"
 log_path.parent.mkdir(parents=True, exist_ok=True)
 with open(log_path, "w") as log_file:

@@ -54,10 +54,12 @@ def main():
     X = np.array(pos_feats + neg_feats)
     y = np.array(pos_labels + neg_labels)
     
+    # Train a Linear Support Vector Classifier (SVM)
     print("[Training] Fitting LinearSVC...")
     clf = LinearSVC(verbose=1, max_iter=10000)
     clf.fit(X, y)
     
+    # Save the trained model
     joblib.dump(clf, model_path)
     print(f"[Model Saved] {model_path}")
     
