@@ -29,6 +29,7 @@ class ImageGUI:
         self.master = master
         self.master.title("GUI")
 
+        # Put relevant element to the GUI
         self.frame = tk.Frame(self.master)
         self.frame.pack(expand=True, padx=10, pady=10)
         self.frame.grid_rowconfigure(0, weight=1)
@@ -50,14 +51,16 @@ class ImageGUI:
         self.button_frame = tk.Frame(self.border)
         self.button_frame.grid(row=2, column=0, columnspan=3, pady=10)
 
+        # The load folder button, connect with load_folder function
         self.load_button = tk.Button(self.button_frame, text="Load Folder", command=self.load_folder)
         self.load_button.pack(side=tk.LEFT, padx=70)
-
+        # The predict button, connect with predict function
         self.predict_button = tk.Button(self.button_frame, text="Predict", command=self.predict)
         self.predict_button.pack(side=tk.LEFT, padx=70)
-
+        # To store the image and their path
         self.original_images = []
         self.image_paths = [] 
+        # Input the model
         base = Path(__file__).resolve().parent
         self.model = joblib.load(base / "Others/models/hog_svm_model_v2.pkl")
 
@@ -66,67 +69,78 @@ class ImageGUI:
         folder_path = filedialog.askdirectory(title="Select Folder")
         if not folder_path:
             return
-
-        for widget in self.image_frame.winfo_children():
+        
+        for widget in self.image_frame.winfo_children(): # Clear the presentation for the past image
             widget.destroy()
+        # Clear the past data for new image and their path
         self.original_images.clear()
         self.image_paths.clear()
+        
         # Get all image files in the folder
         image_files = [os.path.join(folder_path, file) for file in os.listdir(folder_path)
                        if file.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif'))]
         # Display each image in the GUI
-        for image_file in image_files:
+        for image_file in image_files: # Iterate every image in the folder
             img = Image.open(image_file)
-
-            fixed_height = 300
+            
+            # Set image's height to 300 and adjust its width by origin size
+            fixed_height = 300 
             width, height = img.size
             new_width = int((fixed_height / height) * width)
             img = img.resize((new_width, fixed_height))
-
+            
+            # Create a frame for the image
             photo = ImageTk.PhotoImage(img)
-
             image_container = tk.Frame(self.image_frame)
             image_container.pack(side=tk.LEFT, padx=10, pady=5)
-
+            
+            # Get the path of the image
             filename = os.path.basename(image_file)
             filename_label = tk.Label(image_container, text=filename, wraplength=150, justify="center")
             filename_label.pack()
-
+            
+            # Show image's file name in the frame
             image_label = tk.Label(image_container, image=photo)
             image_label.image = photo
             image_label.pack()
-
+            
+            # Add the image to the list
             self.original_images.append(img)
             self.image_paths.append(image_file)
-
+            
+        # Update the image frame
         self.image_frame.update_idletasks()
         self.canvas.config(scrollregion=self.canvas.bbox("all"))
 
     def sliding_windows(self, img, stride=16):
-        # Generator to yield sliding window patches from the image
-        h, w = img.shape
-        y_positions = list(range(0, h - win_h + 1, stride))
-        if (h - win_h) % stride != 0:
+        """
+        Generator for sliding window patches over the input image.
+        Yields patches of size (win_h, win_w) at the given stride.
+        """
+        h, w = img.shape # Get the height and width of the image
+        y_positions = list(range(0, h - win_h + 1, stride)) # Everytime add a stride, and save the position to variable
+        if (h - win_h) % stride != 0: # If there is a small remaining segment at the end, manually add one more window to cover it
             y_positions.append(h - win_h)
-        x_positions = list(range(0, w - win_w + 1, stride))
-        if (w - win_w) % stride != 0:
+        x_positions = list(range(0, w - win_w + 1, stride)) # Everytime add a stride, and save the position to variable
+        if (w - win_w) % stride != 0: # If there is a small remaining segment at the end, manually add one more window to cover it
             x_positions.append(w - win_w)
-        for y in y_positions:
+        for y in y_positions: # Use double loop to generate every possible window image
             for x in x_positions:
                 yield img[y:y+win_h, x:x+win_w]
 
     def pyramid(self, image, scale=PYRAMID_SCALE, min_size=PYRAMID_MIN_SIZE):
         # Generator for image pyramid, yielding downscaled versions of the image
-        yield image
+        yield image # Generate the origin image
 
         while True:
-            h, w = image.shape[:2]
+            h, w = image.shape[:2] # Get the current image height and width
+            # Calculate new image's height and width, everytime devide them by scale
             new_w = int(w / scale)
             new_h = int(h / scale)
-            if new_w < min_size[1] or new_h < min_size[0]:
+            if new_w < min_size[1] or new_h < min_size[0]: # If the image is too small now, stop the process
                 break
 
-            image = cv2.resize(image, (new_w, new_h))
+            image = cv2.resize(image, (new_w, new_h)) # Resize the image in new width and height
             yield image
 
     def predict(self):
@@ -137,14 +151,14 @@ class ImageGUI:
         for widget in self.image_frame.winfo_children():
             widget.destroy()
 
-        predictions = []
+        predictions = [] # To store every prediction
 
-        for img_index, image_path in enumerate(self.image_paths):
+        for img_index, image_path in enumerate(self.image_paths): # For every loaded image
             img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
             if img is None:
                 continue
 
-            detected = False
+            detected = False # To record if it detect human
             
             # Use image pyramid and sliding window to detect humans
             for resized_img in self.pyramid(img, PYRAMID_SCALE):
@@ -153,16 +167,17 @@ class ImageGUI:
                     break
 
                 for patch in self.sliding_windows(resized_img):
-                    f = hog(patch, **HOG_PARAMS)
-                    if self.model.decision_function([f])[0] > threshold:
+                    f = hog(patch, **HOG_PARAMS) # Get the HOG feature of every image
+                    if self.model.decision_function([f])[0] > threshold: # If the score model predicted is greater than threshold, than predict it's human
                         detected = True
                         break
-                if detected:
+                if detected: # If we detect human, stop the process
                     break
 
-            result = 1 if detected else 0
+            result = 1 if detected else 0 # Set the result
             predictions.append({"filename": os.path.basename(image_path), "prediction": result})
-            # Display the image and prediction result
+            
+            # Display the image and prediction result like above
             original_img = Image.open(image_path)
             fixed_height = 300
             width, height = original_img.size
