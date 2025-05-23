@@ -4,7 +4,7 @@ from pathlib import Path
 from skimage.feature import hog
 from tqdm import tqdm
 
-# HOG 和窗口参数
+# HOG and sliding window parameters
 win_w, win_h = 64, 128
 stride = 16
 threshold = 0
@@ -16,9 +16,14 @@ HOG_PARAMS = {
 }
 
 def list_images(path, exts={'.jpg', '.jpeg', '.png', '.bmp'}):
+    # Recursively list all image files with valid extensions under the given path.
     return [p for p in Path(path).rglob("*") if p.suffix.lower() in exts]
 
 def sliding_windows(img, stride=16):
+    """
+    Generator for sliding window patches over the input image.
+    Yields patches of size (win_h, win_w) at the given stride.
+    """
     h, w = img.shape
     y_positions = list(range(0, h - win_h + 1, stride))
     if (h - win_h) % stride != 0:
@@ -51,7 +56,7 @@ def evaluate():
 
     print(f"Evaluating on {total_human} human and {total_nonhuman} non-human images...")
 
-    # 人类图像：图像级 miss rate 和 TP 统计
+    # Evaluate human images: track image-level miss rate and true positives
     for path in tqdm(human_imgs, desc="Human eval"):
         img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
         if img is None:
@@ -69,6 +74,7 @@ def evaluate():
             continue
 
         detected = False
+        # Slide window over image to find any positive detection
         for patch in sliding_windows(img):
             f = hog(patch, **HOG_PARAMS)
             if model.decision_function([f])[0] > threshold:
@@ -80,7 +86,7 @@ def evaluate():
             miss_detected += 1
             false_negative += 1
 
-    # 非人类图像：图像级 FP，窗口级 FP/FPPW
+    # Evaluate non-human images: track false positives on image and window level
     for path in tqdm(nonhuman_imgs, desc="Non-human eval"):
         img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
         if img is None:
@@ -99,6 +105,7 @@ def evaluate():
             continue
 
         detected = False
+        # Slide window over image to find any false positive detection
         for patch in sliding_windows(img):
             f = hog(patch, **HOG_PARAMS)
             total_windows += 1
@@ -110,7 +117,7 @@ def evaluate():
         else:
             true_negative += 1
 
-    # 计算指标
+    # Compute evaluation metrics
     miss_rate = miss_detected / total_human
     fppw = total_fp / total_windows
     total_images = total_human + total_nonhuman
@@ -118,7 +125,7 @@ def evaluate():
     precision = true_positive / (true_positive + false_positive) if (true_positive + false_positive) else 0
     recall = true_positive / (true_positive + false_negative) if (true_positive + false_negative) else 0
 
-    # 输出结果
+    # Print results
     print("\n===== Evaluation Report =====")
     print(f"[Image-level] Miss Rate: {miss_rate:.4f}")
     print(f"[Window-level] FPPW: {fppw:.6f}")
@@ -126,7 +133,7 @@ def evaluate():
     print(f"[Image-level] Precision: {precision:.4f}")
     print(f"[Image-level] Recall: {recall:.4f}")
 
-    # 写入日志
+    # Write results to log file
     log_path = base / "outputs/eval_log_v2.txt"
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with open(log_path, "w") as f:

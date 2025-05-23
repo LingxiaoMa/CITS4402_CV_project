@@ -8,6 +8,7 @@ from sklearn.svm import LinearSVC
 from skimage.feature import hog
 from sklearn.metrics import classification_report
 
+# HOG feature extraction parameters
 HOG_PARAMS = {
     'orientations': 9,
     'pixels_per_cell': (8, 8),
@@ -16,9 +17,11 @@ HOG_PARAMS = {
 }
 
 def list_images(dir_path, valid_exts={".jpg", ".jpeg", ".png", ".bmp"}):
+    # Recursively find all image files in a directory with valid extensions.
     return [p for p in Path(dir_path).rglob("*") if p.suffix.lower() in valid_exts]
 
 def extract_features(image, label, size=(64,128)):
+    # Extract HOG features from a list of images and assign them the given label.
     features = []
     labels = []
     for path in tqdm(image, desc=f"Extracting HOG for label {label}"):
@@ -43,9 +46,11 @@ def main():
     
     print(f"Loading {len(pos_images)} positive and {len(neg_images)} negative samples...")
     
+    # Extract HOG features and labels for both positive and negative samples
     pos_feats, pos_labels = extract_features(pos_images, label=1)
     neg_feats, neg_labels = extract_features(neg_images, label=0)
     
+    # Combine features and labels for the model training
     X = np.array(pos_feats + neg_feats)
     y = np.array(pos_labels + neg_labels)
     
@@ -56,6 +61,7 @@ def main():
     joblib.dump(clf, model_path)
     print(f"[Model Saved] {model_path}")
     
+    # Evaluate the model on the training data
     preds = clf.predict(X)
     report = classification_report(y, preds, digits=4)
     print(report)

@@ -10,6 +10,10 @@ win_w, win_h = 64, 128
 stride = 16
 
 def sliding_windows(img):
+    """
+    Generator function to yield patches using a sliding window over the input image.
+    Each patch is of size (win_h, win_w) and moves with the defined stride.
+    """
     h, w = img.shape
     y_positions = list(range(0, h - win_h + 1, stride))
     if (h - win_h) % stride != 0:
@@ -22,9 +26,11 @@ def sliding_windows(img):
             yield img[y:y + win_h, x:x + win_w]
 
 def list_images(folder, exts={'.jpg', '.jpeg', '.png', '.bmp'}):
+    # Recursively list all image files in a folder with specified extensions.
     return [p for p in Path(folder).rglob("*") if p.suffix.lower() in exts]
 
 def evaluate_det_curve(model_path, hog_params, thresholds):
+    # Evaluate the DET curve for a given model and set of HOG parameters.
     base = Path(__file__).resolve().parent.parent
     model = joblib.load(model_path)
 
@@ -38,13 +44,14 @@ def evaluate_det_curve(model_path, hog_params, thresholds):
         total_windows = 0
         true_positive = 0
         pbar = tqdm(total=len(human_imgs) + len(nonhuman_imgs), desc=f"Threshold {threshold:.2f}")
-
+        # Evaluate on human images
         for path in human_imgs:
             img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
             if img is None:
                 pbar.update(1)
                 continue
             h, w = img.shape
+            # If image is smaller than window, resize it  
             if h < win_h or w < win_w:
                 img = cv2.resize(img, (win_w, win_h))
                 f = hog(img, **hog_params)
@@ -56,6 +63,7 @@ def evaluate_det_curve(model_path, hog_params, thresholds):
                 continue
 
             detected = False
+            # Slide window over the image, check if any patch triggers a positive detection
             for patch in sliding_windows(img):
                 f = hog(patch, **hog_params)
                 if model.decision_function([f])[0] > threshold:
@@ -66,13 +74,14 @@ def evaluate_det_curve(model_path, hog_params, thresholds):
             else:
                 miss += 1
             pbar.update(1)
-
+        # Evaluate on non-human images
         for path in nonhuman_imgs:
             img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
             if img is None:
                 pbar.update(1)
                 continue
             h, w = img.shape
+            # If image is smaller than window, resize it
             if h < win_w or w < win_h:
                 img = cv2.resize(img, (win_w, win_h))
                 f = hog(img, **hog_params)
@@ -81,14 +90,14 @@ def evaluate_det_curve(model_path, hog_params, thresholds):
                     total_fp += 1
                 pbar.update(1)
                 continue
-
+            # Slide window, count all false positives
             for patch in sliding_windows(img):
                 f = hog(patch, **hog_params)
                 total_windows += 1
                 if model.decision_function([f])[0] > threshold:
                     total_fp += 1
             pbar.update(1)
-
+        # Calculate miss rate and FPPW
         miss_rate = miss / len(human_imgs)
         fppw = total_fp / total_windows
         results.append((threshold, fppw, miss_rate))
@@ -97,6 +106,7 @@ def evaluate_det_curve(model_path, hog_params, thresholds):
     return results
 
 def plot_det(det_curves, save_path):
+    # Plot the DET curves for different model configurations.
     plt.figure(figsize=(8, 6))
     for label, points in det_curves.items():
         fppw = [x[1] for x in points]
@@ -114,9 +124,10 @@ def plot_det(det_curves, save_path):
     print(f"[Saved] DET curve at {save_path}")
 
 if __name__ == "__main__":
+    # Define thresholds to sweep over for DET evaluation
     thresholds = np.linspace(-1.5, 1.5, 11)
-
-    # === Normalization experiment setup ===
+    
+    # Paths for different models with different normalization technique
     norms = [
         ("L1", "hog_svm_model_v2_L1norm.pkl"),
         ("L2", "hog_svm_model_v2_L2norm.pkl"),
@@ -126,7 +137,7 @@ if __name__ == "__main__":
     base = Path(__file__).resolve().parent.parent
     curves = {}
 
-
+    # Define HOG parameters for each normalization technique setting
     for name, model_file in norms:
         model_path = base / "models" / model_file
         print(f"[INFO] Evaluating normalization={name}...")
@@ -139,4 +150,5 @@ if __name__ == "__main__":
         res = evaluate_det_curve(model_path, hog_params, thresholds)
         curves[f"norm={name}"] = res
 
+    # Plot and save the DET curves
     plot_det(curves, base / "outputs/det_norms2.png")

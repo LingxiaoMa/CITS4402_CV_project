@@ -8,33 +8,34 @@ output_summary_path = Path(__file__).resolve().parent.parent / "outputs/sample_c
 
 
 def list_images_in_dir(dir_path, valid_exts={".jpg", ".jpeg", ".png", ".bmp"}):
+    # Traverse the directory and return a list of all valid image file paths
     return [p for p in Path(dir_path).rglob("*") if p.suffix.lower() in valid_exts]
 
 
 def resize(img, out_path, size):
+    # Resize the image and save it to the specified path.
     resized = cv2.resize(img, size)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     cv2.imwrite(str(out_path), resized)
 
 
 def mirror_resize(input, output, size=(64, 128)):
+    # Resize all images in the specified directory and generate their horizontally flipped versions.
     input = Path(input)
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
 
     images = list_images_in_dir(input)
-    # images = random.sample(images, 10000)
     count = 0
 
     for img_path in tqdm(images, desc="Processing positive samples"):
         img = cv2.imread(str(img_path))
         if img is None:
             continue
-
+            
         out_name = output / f"pos_{count:06d}.jpg"
         resize(img, out_name, size)
 
-        # 镜像图
         flipped = cv2.flip(img, 1)
         out_flip_name = output / f"pos_{count+1:06d}.jpg"
         resize(flipped, out_flip_name, size)
@@ -44,6 +45,7 @@ def mirror_resize(input, output, size=(64, 128)):
 
 
 def random_crop(img, crop_ratio=(0.25, 0.5)):
+    # Randomly crop a portion of the image, with the crop ratio specified by crop_ratio.
     h, w, _ = img.shape
     ch, cw = int(h * crop_ratio[1]), int(w * crop_ratio[0])
     if h < ch or w < cw:
@@ -53,12 +55,12 @@ def random_crop(img, crop_ratio=(0.25, 0.5)):
     return img[y:y+ch, x:x+cw]
 
 def random_crop_patches(input_dir, output_dir, target_size=(64,128), patches_per_image=10):
+    # Randomly crop several patches from each image, resize them, and save.
     input_dir = Path(input_dir)
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     images = list_images_in_dir(input_dir)
-    # images = random.sample(images, 2000)
     collected = 0
 
     for img_path in tqdm(images, desc="Processing negative samples"):
@@ -79,22 +81,26 @@ def random_crop_patches(input_dir, output_dir, target_size=(64,128), patches_per
     
     
 def count_images(dir_path):
+    # Count the number of images in the directory.
     return len(list_images_in_dir(dir_path))
     
 def main():
+
+    # Define the input output directory.
     dataset_root = Path(__file__).resolve().parent.parent / "dataset-big"
     output_root = Path(__file__).resolve().parent.parent / "data_processed"
-
+    
     positive_input = dataset_root / "Training set/human"
     negative_input = dataset_root / "Training set/non-human"
     positive_output = output_root / "positive"
     negative_output = output_root / "negative"
 
-
+    # Process positive samples: resize and mirror.
     mirror_resize(positive_input, positive_output)
-
+    # Process negative samples: randomly crop patches.
     random_crop_patches(negative_input, negative_output, patches_per_image=10)
     
+    # Make a summary report
     output_summary_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_summary_path, "w") as f:
         pos_count = count_images(positive_output)

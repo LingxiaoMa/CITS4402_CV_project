@@ -11,6 +11,10 @@ stride = 16
 
 
 def sliding_windows(img):
+    """
+    Generator function to yield patches using a sliding window over the input image.
+    Each patch is of size (win_h, win_w) and moves with the defined stride.
+    """
     h, w = img.shape
     y_positions = list(range(0, h - win_h + 1, stride))
     if (h - win_h) % stride != 0:
@@ -24,10 +28,12 @@ def sliding_windows(img):
 
 
 def list_images(folder, exts={".jpg", ".jpeg", ".png", ".bmp"}):
+    # Recursively list all image files in a folder with specified extensions.
     return [p for p in Path(folder).rglob("*") if p.suffix.lower() in exts]
 
 
 def evaluate_det_curve(model_path, hog_params, thresholds):
+    # Evaluate the DET curve for a given model and set of HOG parameters.
     base = Path(__file__).resolve().parent.parent
     model = joblib.load(model_path)
 
@@ -41,12 +47,13 @@ def evaluate_det_curve(model_path, hog_params, thresholds):
         total_fp = 0
         total_windows = 0
 
-        # Evaluate human
+        # Evaluate on human images
         for path in human_imgs:
             img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
             if img is None:
                 continue
             h, w = img.shape
+            # If image is smaller than window, resize it
             if h < win_h or w < win_w:
                 img = cv2.resize(img, (win_w, win_h))
                 patch = img
@@ -58,6 +65,7 @@ def evaluate_det_curve(model_path, hog_params, thresholds):
                 continue
 
             detected = False
+            # Slide window over the image, check if any patch triggers a positive detection
             for patch in sliding_windows(img):
                 f = hog(patch, **hog_params)
                 if model.decision_function([f])[0] > threshold:
@@ -66,12 +74,13 @@ def evaluate_det_curve(model_path, hog_params, thresholds):
             if not detected:
                 miss += 1
 
-        # Evaluate non-human
+        # Evaluate on non-human images
         for path in nonhuman_imgs:
             img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
             if img is None:
                 continue
             h, w = img.shape
+            # If image is smaller than window, resize it
             if h < win_h or w < win_w:
                 img = cv2.resize(img, (win_w, win_h))
                 patch = img
@@ -81,12 +90,14 @@ def evaluate_det_curve(model_path, hog_params, thresholds):
                     total_fp += 1
                 continue
 
+            # Slide window, count all false positives
             for patch in sliding_windows(img):
                 f = hog(patch, **hog_params)
                 total_windows += 1
                 if model.decision_function([f])[0] > threshold:
                     total_fp += 1
 
+        # Calculate miss rate and FPPW
         miss_rate = miss / len(human_imgs)
         fppw = total_fp / total_windows
         results.append((threshold, fppw, miss_rate))
@@ -95,6 +106,7 @@ def evaluate_det_curve(model_path, hog_params, thresholds):
 
 
 def plot_det(det_curves, save_path):
+    # Plot the DET curves for different model configurations.
     plt.figure(figsize=(8, 6))
     for label, points in det_curves.items():
         fppw = [x[1] for x in points]
@@ -113,21 +125,22 @@ def plot_det(det_curves, save_path):
 
 
 if __name__ == "__main__":
+    # Define thresholds to sweep over for DET evaluation
     thresholds = np.linspace(-1.5, 1.5, 11)
 
     base = Path(__file__).resolve().parent.parent
+    # Paths for different models with different number of orientation bins
     model_bin6 = base / "models/hog_svm_model_bin6_v2.pkl"
     model_bin9 = base / "models/hog_svm_model_v2.pkl"
     model_bin12 = base / "models/hog_svm_model_bin12_v2.pkl"
     
-
+    # Define HOG parameters for each bin setting
     hog_bin9 = {
         "orientations": 9,
         "pixels_per_cell": (8, 8),
         "cells_per_block": (2, 2),
         "block_norm": "L2-Hys",
     }
-
     hog_bin12 = hog_bin9.copy()
     hog_bin6 = hog_bin9.copy()
     hog_bin12["orientations"] = 12
@@ -142,6 +155,6 @@ if __name__ == "__main__":
     print("[INFO] Evaluating bin=12 model...")
     res_12 = evaluate_det_curve(model_bin12, hog_bin12, thresholds)
 
+    # Plot and save the DET curves
     curves = {"bin=6": res_6, "bin=9" : res_9 ,"bin=12": res_12}
-
     plot_det(curves, base / "outputs/det_bins.png")
