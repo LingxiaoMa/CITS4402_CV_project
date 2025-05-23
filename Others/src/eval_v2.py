@@ -24,26 +24,28 @@ def sliding_windows(img, stride=16):
     Generator for sliding window patches over the input image.
     Yields patches of size (win_h, win_w) at the given stride.
     """
-    h, w = img.shape
-    y_positions = list(range(0, h - win_h + 1, stride))
-    if (h - win_h) % stride != 0:
+    h, w = img.shape # Get the height and width of the image
+    y_positions = list(range(0, h - win_h + 1, stride)) # Everytime add a stride, and save the position to variable
+    if (h - win_h) % stride != 0: # If there is a small remaining segment at the end, manually add one more window to cover it
         y_positions.append(h - win_h)
-    x_positions = list(range(0, w - win_w + 1, stride))
-    if (w - win_w) % stride != 0:
+    x_positions = list(range(0, w - win_w + 1, stride)) # Everytime add a stride, and save the position to variable
+    if (w - win_w) % stride != 0: # If there is a small remaining segment at the end, manually add one more window to cover it
         x_positions.append(w - win_w)
-    for y in y_positions:
+    for y in y_positions: # Use double loop to generate every possible window image
         for x in x_positions:
             yield img[y:y+win_h, x:x+win_w]
 
 def evaluate():
+    # Input the model
     base = Path(__file__).resolve().parent.parent
     model = joblib.load(base / "models/hog_svm_model_v2.pkl")
-
+    # Input the image
     human_dir = base / "dataset-big/Testing set/human"
     nonhuman_dir = base / "dataset-big/Testing set/non-human"
     human_imgs = list_images(human_dir)
     nonhuman_imgs = list_images(nonhuman_dir)
 
+    # Set the default value
     total_human = len(human_imgs)
     total_nonhuman = len(nonhuman_imgs)
     total_fp = 0
@@ -58,23 +60,23 @@ def evaluate():
 
     # Evaluate human images: track image-level miss rate and true positives
     for path in tqdm(human_imgs, desc="Human eval"):
-        img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+        img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE) 
         if img is None:
             continue
         h, w = img.shape
         if h < win_h or w < win_w:
-            img = cv2.resize(img, (win_w, win_h))
+            img = cv2.resize(img, (win_w, win_h)) # If the image is smaller than the detection window, resize it to the window size
             patch = img
-            f = hog(patch, **HOG_PARAMS)
-            if model.decision_function([f])[0] > threshold:
+            f = hog(patch, **HOG_PARAMS) # Use the entire image as a single patch to extract HOG features.
+            if model.decision_function([f])[0] > threshold: # If the score is greater than the threshold, mean we successfully detect people(success), and increment true_positive
                 true_positive += 1
-            else:
+            else: # If the score is less than the threshold, mean we fail to detect people(fail), and increment false_positive and miss_detected
                 miss_detected += 1
                 false_negative += 1
             continue
 
         detected = False
-        # Slide window over image to find any positive detection
+        # Slide window over image to find any positive detection, and do the same thing as above
         for patch in sliding_windows(img):
             f = hog(patch, **HOG_PARAMS)
             if model.decision_function([f])[0] > threshold:
@@ -88,24 +90,24 @@ def evaluate():
 
     # Evaluate non-human images: track false positives on image and window level
     for path in tqdm(nonhuman_imgs, desc="Non-human eval"):
-        img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+        img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE) 
         if img is None:
             continue
         h, w = img.shape
         if h < win_h or w < win_w:
-            img = cv2.resize(img, (win_w, win_h))
+            img = cv2.resize(img, (win_w, win_h)) # If the image is smaller than the detection window, resize it to the window size
             patch = img
-            f = hog(patch, **HOG_PARAMS)
+            f = hog(patch, **HOG_PARAMS) # Use the entire image as a single patch to extract HOG features.
             total_windows += 1
-            if model.decision_function([f])[0] > threshold:
+            if model.decision_function([f])[0] > threshold: # If the score is greater than the threshold, mean we fail to detect non_human(fail) and increment total_fp and false_positive
                 total_fp += 1
                 false_positive += 1
-            else:
+            else: # If the score is less than the threshold, mean we successfully detect non_human(success) and increment true_negative
                 true_negative += 1
             continue
 
         detected = False
-        # Slide window over image to find any false positive detection
+        # Slide window over image to find any false positive detection, and do the same thing as above
         for patch in sliding_windows(img):
             f = hog(patch, **HOG_PARAMS)
             total_windows += 1
