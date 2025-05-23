@@ -1,0 +1,5 @@
+Hard negative mining completed.
+Model used: hog_svm_model_v1.pkl
+Negative source images: 7166
+Newly add 21815 samples
+Final negative sample count: 93465

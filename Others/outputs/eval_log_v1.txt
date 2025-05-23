@@ -1,0 +1,6 @@
+===== Evaluation Report =====
+[Image-level] Miss Rate: 0.0300
+[Window-level] FPPW: 0.030706
+[Image-level] Accuracy: 0.6350
+[Image-level] Precision: 0.5808
+[Image-level] Recall: 0.9700
